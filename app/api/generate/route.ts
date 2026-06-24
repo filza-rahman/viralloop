@@ -1,5 +1,5 @@
 import Groq from "groq-sdk"
-import { z } from "zod"
+import { addGeneration } from "@/lib/history-store"
 import type { PlatformId, PlatformResult } from "@/lib/platforms"
 
 export const maxDuration = 60
@@ -15,27 +15,20 @@ const PLATFORM_GUIDE: Record<PlatformId, string> = {
     "Reddit: authentic, community-native, no marketing tone. Sounds like a real person sharing genuinely. Honest, specific, and helpful. No hashtags, no emojis-as-bullets, no salesy language.",
 }
 
-const ResultSchema = z.object({
-  content: z.string(),
-  score: z.number(),
-  explanation: z.string(),
-})
-
 export async function POST(req: Request) {
   try {
-    const { idea, platforms } = (await req.json()) as {
-      idea?: string
-      platforms?: PlatformId[]
-    }
+    const body = await req.json()
+    const idea = body?.idea as string | undefined
+    const platforms = body?.platforms as PlatformId[] | undefined
 
     if (!idea || !idea.trim()) {
       return Response.json({ error: "Idea is required." }, { status: 400 })
     }
 
-    const selected =
+    const selected: PlatformId[] =
       Array.isArray(platforms) && platforms.length
         ? platforms
-        : (["twitter", "linkedin", "reddit"] as PlatformId[])
+        : ["twitter", "linkedin", "reddit"]
 
     const results = await Promise.all(
       selected.map(async (platform): Promise<PlatformResult> => {
@@ -45,47 +38,74 @@ export async function POST(req: Request) {
             {
               role: "system",
               content:
-                "You are ViralLoop, an expert social media ghostwriter who rewrites raw ideas into platform-native posts that spread. Always respond with valid JSON only, no markdown, no explanation outside the JSON.",
+                "You are ViralLoop, an expert social media ghostwriter. Always respond with valid JSON only. No markdown, no backticks, no explanation.",
             },
             {
               role: "user",
-              content: `Rewrite the following raw idea into a ${platform} post.
+              content: `Rewrite this idea into a ${platform} post.
 
 Platform guidance: ${PLATFORM_GUIDE[platform]}
 
-Raw idea:
-"""${idea.trim()}"""
+Raw idea: "${idea.trim()}"
 
-Respond with ONLY this JSON (no markdown, no backticks):
-{
-  "content": "the finished post ready to publish",
-  "score": 85,
-  "explanation": "two-line explanation of the virality score"
-}`,
+Respond with ONLY this JSON structure:
+{"content":"the finished post","score":75,"explanation":"two sentences explaining the score"}`,
             },
           ],
           temperature: 0.7,
           max_tokens: 1024,
         })
 
-        const raw = completion.choices[0]?.message?.content ?? "{}"
-        const cleaned = raw.replace(/```json|```/g, "").trim()
-        const parsed = ResultSchema.parse(JSON.parse(cleaned))
+        const raw = completion.choices[0]?.message?.content ?? ""
+        // Extract JSON object even if model wraps it in text
+        const jsonMatch = raw.match(/\{[\s\S]*\}/)
+        const cleaned = jsonMatch ? jsonMatch[0].trim() : raw.trim()
+
+        let parsed: { content: string; score: number; explanation: string }
+        let content = ""
+        let score = 70
+        let explanation = ""
+
+        try {
+          const jsonMatch = raw.match(/\{[\s\S]*\}/)
+          if (jsonMatch) {
+            const parsed = JSON.parse(jsonMatch[0])
+            content = parsed.content ?? ""
+            score = Number(parsed.score) || 70
+            explanation = parsed.explanation ?? ""
+          }
+        } catch {
+          content = raw.trim()
+        }
+
+        if (content.startsWith("{") || content.includes('"content"')) {
+          const contentMatch = raw.match(/"content"\s*:\s*"([\s\S]*?)(?<!\\)",/)
+          if (contentMatch) content = contentMatch[1].replace(/\\n/g, "\n")
+        }
 
         return {
           platform,
-          content: parsed.content,
-          score: Math.max(0, Math.min(100, Math.round(parsed.score))),
-          explanation: parsed.explanation,
+          content: content || raw.trim(),
+          score: Math.max(0, Math.min(100, Math.round(score))),
+          explanation,
         }
       })
     )
+
+    // Save to DynamoDB
+    await addGeneration({
+      id: crypto.randomUUID(),
+      idea: idea.trim(),
+      createdAt: new Date().toISOString(),
+      platforms: selected,
+      results,
+    })
 
     return Response.json({ results })
   } catch (err) {
     console.error("[viralloop] generate error:", err)
     return Response.json(
-      { error: "Failed to generate content. Please try again." },
+      { error: "Failed to generate content. Please try again.", detail: String(err) },
       { status: 500 }
     )
   }

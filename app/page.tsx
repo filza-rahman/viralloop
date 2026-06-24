@@ -112,8 +112,8 @@ export default function Page() {
           <h2 className="max-w-[16ch] text-balance text-[clamp(48px,9vw,96px)] font-black leading-[0.95] tracking-tight">
             Ready to spread?
           </h2>
-          <div className="mt-12">
-            <a
+        <div className="mt-12">
+            <Link
               href="/dashboard"
               className="group relative inline-flex items-center justify-center overflow-hidden rounded-full p-[2px]"
             >

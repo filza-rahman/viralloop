@@ -18,7 +18,7 @@ export function AppSidebar() {
   return (
     <aside className="flex h-full w-full flex-col bg-sidebar">
       <Link
-        href="/dashboard"
+        href="/"
         className="flex items-center gap-2 px-5 py-5 text-sidebar-foreground"
       >
         <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">

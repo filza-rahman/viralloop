@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { GeneratingState } from "@/components/generating-state"
 import { ResultCard } from "@/components/result-card"
-import { addGeneration } from "@/lib/history-store"
 import {
   PLATFORMS,
   type PlatformId,
@@ -53,13 +52,6 @@ export default function DashboardPage() {
       if (!res.ok) throw new Error("request failed")
       const data = (await res.json()) as { results: PlatformResult[] }
       setResults(data.results)
-      addGeneration({
-        id: crypto.randomUUID(),
-        idea: idea.trim(),
-        createdAt: new Date().toISOString(),
-        platforms: selected,
-        results: data.results,
-      })
     } catch {
       toast.error("Generation failed. Please try again.")
     } finally {
