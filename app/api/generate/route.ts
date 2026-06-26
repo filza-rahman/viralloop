@@ -116,8 +116,16 @@ Respond with ONLY this JSON (no markdown, no backticks):
       })
     )
 
+    await addGeneration({
+      id: crypto.randomUUID(),
+      idea: idea.trim(),
+      createdAt: new Date().toISOString(),
+      platforms: selected,
+      results,
+    })
+
     return Response.json({ results })
-  } catch (err) {
+  } catch (err) {  
     console.error("[viralloop] generate error:", err)
     return Response.json(
       { error: "Failed to generate content. Please try again." },
