@@ -151,7 +151,7 @@ export default function Page() {
         {/* Nav */}
         <header className="flex items-center justify-between px-6 py-7 md:px-12">
           <span className="text-sm font-medium uppercase tracking-[0.25em]">
-            Viral<span className="text-white/40">Loop</span>
+            Cast<span className="text-white/40">Wide</span>
           </span>
           <nav className="hidden items-center gap-8 font-mono text-xs uppercase tracking-widest text-white/45 md:flex">
             <a href="#features" className="transition-colors hover:text-white">Process</a>
